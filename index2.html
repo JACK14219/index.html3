@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Prémiový Kvíz o Velké Británii</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow-x: hidden;
+            background-color: #1a1a1a;
+        }
+
+        body {
+            background-image: url('https://www.vlajky.eu/vlajky/93/VB.jpg');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 15px;
+        }
+
+        /* Vyskakovací okno pro nápovědu (přes celou obrazovku) */
+        .hint-modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 1001;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(3px);
+        }
+
+        .hint-modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            text-align: center;
+            max-width: 85%;
+            width: 320px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            animation: pop-in 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes pop-in {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .hint-modal-content p {
+            font-size: 1.2rem;
+            color: #1f2937;
+            font-weight: 600;
+            margin-bottom: 25px;
+            line-height: 1.4;
+        }
+
+        .close-hint-btn {
+            background-color: #00247D;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            font-size: 1rem;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: bold;
+            width: 100%;
+        }
+
+        /* Vyladěné zatřesení pouze pro špatnou odpověď */
+        @keyframes soft-shake {
+            0% { transform: translateX(0); }
+            15% { transform: translateX(-12px); }
+            30% { transform: translateX(10px); }
+            45% { transform: translateX(-8px); }
+            60% { transform: translateX(5px); }
+            75% { transform: translateX(-2px); }
+            100% { transform: translateX(0); }
+        }
+
+        .shake-active {
+            animation: soft-shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        /* Hlavní kontejner */
+        .quiz-container {
+            position: relative;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            padding: 50px 25px 30px 25px;
+            border-radius: 24px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            width: 100%;
+            max-width: 500px;
+            text-align: center;
+            z-index: 10;
+        }
+
+        /* Tlačítko nápovědy umístěné v levém horním rohu bílého rámečku */
+        .hint-btn {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            background: #f3f4f6;
+            border: 1px solid #d1d5db;
+            color: #00247D;
+            padding: 6px 14px;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 0.85rem;
+            cursor: pointer;
+            z-index: 20;
+            transition: all 0.2s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .hint-btn:active {
+            transform: scale(0.95);
+            background: #e5e7eb;
+        }
+
+        .fade-content {
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.3s ease;
+        }
+        
+        .show-content {
+            opacity: 1;
+            transform: translateY(0);
+            transition: all 0.3s ease;
+        }
+
+        h1 {
+            color: #00247D;
+            margin-bottom: 8px;
+            font-size: 1.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            font-weight: 800;
+        }
+
+        .progress {
+            font-size: 0.95rem;
+            color: #cf142b;
+            font-weight: 700;
+            margin-bottom: 25px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .question {
+            font-size: 1.35rem;
+            color: #1f2937;
+            font-weight: 600;
+            margin-bottom: 25px;
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1.4;
+        }
+
+        .options-container {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 14px;
+        }
+
+        .options-container.disabled .btn {
+            pointer-events: none;
+        }
+
+        .btn {
+            background-color: #f9fafb;
+            color: #00247D;
+            border: 2px solid #e5e7eb;
+            padding: 16px 15px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            border-radius: 14px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            outline: none;
+            user-select: none; 
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .btn:active {
+            transform: scale(0.97);
+            background-color: #f3f4f6;
+        }
+
+        /* Stavy pro správnou a špatnou odpověď */
+        .btn.correct {
+            background-color: #22c55e !important;
+            color: white !important;
+            border-color: #22c55e !important;
+        }
+
+        .btn.wrong {
+            background-color: #ef4444 !important;
+            color: white !important;
+            border-color: #ef4444 !important;
+        }
+
+        /* Animovaný kontejner pro plynulé vysouvání tlačítka Další */
+        .next-btn-container {
+            display: flex;
+            justify-content: flex-end;
+            overflow: hidden;
+            max-height: 0;
+            opacity: 0;
+            transform: translateY(-10px);
+            transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), 
+                        opacity 0.3s ease, 
+                        transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                        margin-top 0.4s ease;
+        }
+
+        .next-btn-container.show {
+            margin-top: 20px;
+            max-height: 60px;
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .next-btn {
+            background-color: #00247D;
+            color: white;
+            border: none;
+            padding: 12px 28px;
+            font-size: 1.05rem;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .next-btn:active {
+            transform: scale(0.95);
+        }
+
+        .result-container {
+            display: none;
+        }
+
+        .score-text {
+            font-size: 1.7rem;
+            margin-bottom: 25px;
+            color: #1f2937;
+            font-weight: bold;
+        }
+
+        .restart-btn {
+            background-color: #cf142b;
+            color: white;
+            border: none;
+            padding: 18px 30px;
+            font-size: 1.2rem;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+            width: 100%;
+            transition: all 0.3s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .secondary-btn {
+            background-color: #e5e7eb;
+            color: #1f2937;
+            border: none;
+            padding: 16px 30px;
+            font-size: 1.1rem;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+            width: 100%;
+            margin-top: 12px;
+            transition: all 0.2s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .secondary-btn:active {
+            background-color: #d1d5db;
+            transform: scale(0.98);
+        }
+
+        /* Animovaný kontejner pro plynulé vysouvání a zasouvání chyb */
+        .mistakes-box {
+            text-align: left;
+            overflow: hidden;
+            max-height: 0;
+            opacity: 0;
+            border-top: 2px dashed transparent;
+            padding-top: 0;
+            margin-top: 0;
+            transition: max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+                        opacity 0.4s ease,
+                        padding-top 0.4s ease,
+                        margin-top 0.4s ease,
+                        border-color 0.4s ease;
+        }
+
+        .mistakes-box.show {
+            margin-top: 25px;
+            border-color: #e5e7eb;
+            padding-top: 20px;
+            max-height: 360px;
+            opacity: 1;
+        }
+
+        .mistakes-title {
+            font-size: 1.2rem;
+            color: #cf142b;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .mistakes-list {
+            max-height: 240px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .mistake-item {
+            background: #f9fafb;
+            border-left: 4px solid #cf142b;
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+        }
+
+        .mistake-q {
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 4px;
+            font-size: 0.95rem;
+        }
+
+        .mistake-u {
+            color: #ef4444;
+            font-size: 0.9rem;
+            text-decoration: line-through;
+        }
+
+        .mistake-c {
+            color: #22c55e;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        @media (max-width: 400px) {
+            h1 { font-size: 1.4rem; margin-top: 10px; }
+            .question { font-size: 1.15rem; min-height: 70px; }
+            .btn { padding: 14px 10px; font-size: 1rem; }
+            .quiz-container { padding: 45px 15px 20px 15px; }
+            .hint-btn { padding: 5px 10px; font-size: 0.8rem; top: 12px; left: 12px; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="hint-modal" class="hint-modal-overlay">
+    <div class="hint-modal-content">
+        <p>Odpovědi jsou rozmístěny po třídě.</p>
+        <button class="close-hint-btn" onclick="closeHint()">Rozumím</button>
+    </div>
+</div>
+
+<div class="quiz-container" id="quiz-container">
+    <button class="hint-btn" onclick="openHint()">💡 Nápověda</button>
+
+    <div id="quiz-box">
+        <h1>Velká Británie</h1>
+        <div class="progress" id="progress">Otázka 1 z 10</div>
+        
+        <div id="content-wrapper" class="show-content">
+            <div class="question" id="question">Načítání otázky...</div>
+            <div class="options-container" id="options">
+                </div>
+            
+            <div class="next-btn-container" id="next-container">
+                <button class="next-btn" onclick="nextQuestion()">Další →</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="result-box" class="result-container">
+        <h1>Konec kvízu!</h1>
+        <p class="score-text" id="score-text">Tvůj výsledek: 0 / 10</p>
+        <button class="restart-btn" onclick="restartQuiz()">Zkusit znovu</button>
+        <button id="toggle-mistakes-btn" class="secondary-btn" style="display: none;" onclick="toggleMistakes()">Zobrazit chyby</button>
+        
+        <div id="mistakes-box" class="mistakes-box">
+            <h3 class="mistakes-title">Kde se stala chyba:</h3>
+            <div id="mistakes-list" class="mistakes-list"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const quizData = [
+        { question: "Jaké je hlavní město Spojeného království?", options: ["Edinburgh", "Londýn", "Cardiff", "Manchester"], correct: 1 },
+        { question: "Jaká měna se používá ve Velké Británii?", options: ["Euro", "Americký dolar", "Britská libra", "Zlatý frank"], correct: 2 },
+        { question: "Která řeka protéká Londýnem?", options: ["Temže", "Severn", "Trent", "Avon"], correct: 0 },
+        { question: "Jak se lidově přezdívá britské vlajce?", options: ["Stars and Stripes", "Tricolour", "Jolly Roger", "Union Jack"], correct: 3 },
+        { question: "Kdo je současným panovníkem?", options: ["Královna Alžběta II.", "Král Karel III.", "Princ William", "Král Jiří VI."], correct: 1 },
+        { question: "Jak se jmenuje slavný pravěký kruh z kamenů na jihu Anglie?", options: ["Stonehenge", "Hadriánův val", "Loch Ness", "Big Ben"], correct: 0 },
+        { question: "Jak se jmenuje nejvyšší hora Velké Británie?", options: ["Snowdon", "Scafell Pike", "Ben Nevis", "Slieve Donard"], correct: 2 },
+        { question: "Na jaké adrese v Londýně sídlí britský premiér?", options: ["Baker Street 221B", "Downing Street 10", "Abbey Road", "Trafalgar Square"], correct: 1 },
+        { question: "Která z těchto zemí NENÍ součástí ostrova Velká Británie?", options: ["Anglie", "Skotsko", "Wales", "Severní Irsko"], correct: 3 },
+        { question: "Jaké je legendární jméno zbojníka ze Sherwoodského lesa?", options: ["Král Artuš", "Sherlock Holmes", "Robin Hood", "Jack Rozparovač"], correct: 2 }
+    ];
+
+    let currentQuestion = 0;
+    let score = 0;
+    let isAnimating = false; 
+    let userAnswers = []; 
+
+    const quizContainer = document.getElementById('quiz-container');
+    const quizBox = document.getElementById('quiz-box');
+    const contentWrapper = document.getElementById('content-wrapper');
+    const resultBox = document.getElementById('result-box');
+    const questionEl = document.getElementById('question');
+    const optionsContainer = document.getElementById('options');
+    const progressEl = document.getElementById('progress');
+    const scoreTextEl = document.getElementById('score-text');
+    const nextContainer = document.getElementById('next-container');
+    const toggleMistakesBtn = document.getElementById('toggle-mistakes-btn');
+    const mistakesBox = document.getElementById('mistakes-box');
+    const mistakesList = document.getElementById('mistakes-list');
+    const hintModal = document.getElementById('hint-modal');
+
+    function openHint() { hintModal.style.display = 'flex'; }
+    function closeHint() { hintModal.style.display = 'none'; }
+
+    function loadQuiz() {
+        if (currentQuestion < quizData.length) {
+            nextContainer.classList.remove('show'); 
+            optionsContainer.classList.remove('disabled');
+
+            progressEl.innerText = `Otázka ${currentQuestion + 1} z ${quizData.length}`;
+            questionEl.innerText = quizData[currentQuestion].question;
+            optionsContainer.innerHTML = '';
+            
+            quizData[currentQuestion].options.forEach((option, index) => {
+                const button = document.createElement('button');
+                button.classList.add('btn');
+                button.innerText = option;
+                button.addEventListener('click', () => selectAnswer(index));
+                optionsContainer.appendChild(button);
+            });
+
+            contentWrapper.classList.add('show-content');
+            contentWrapper.classList.remove('fade-content');
+            isAnimating = false;
+
+        } else {
+            showResults();
+        }
+    }
+
+    function selectAnswer(selectedIndex) {
+        if (isAnimating) return;
+        isAnimating = true;
+
+        optionsContainer.classList.add('disabled');
+
+        const correctIndex = quizData[currentQuestion].correct;
+        const isCorrect = (selectedIndex === correctIndex);
+
+        userAnswers.push({
+            questionIndex: currentQuestion,
+            selectedIndex: selectedIndex,
+            isCorrect: isCorrect
+        });
+
+        const buttons = optionsContainer.querySelectorAll('.btn');
+
+        if (isCorrect) {
+            score++;
+            buttons[selectedIndex].classList.add('correct');
+        } else {
+            buttons[selectedIndex].classList.add('wrong');
+            buttons[correctIndex].classList.add('correct');
+            
+            quizContainer.classList.add('shake-active');
+            setTimeout(() => {
+                quizContainer.classList.remove('shake-active');
+            }, 500);
+        }
+        
+        nextContainer.classList.add('show');
+    }
+
+    function nextQuestion() {
+        currentQuestion++;
+        
+        contentWrapper.classList.remove('show-content');
+        contentWrapper.classList.add('fade-content');
+        nextContainer.classList.remove('show'); 
+        
+        setTimeout(() => {
+            loadQuiz();
+        }, 300);
+    }
+
+    function showResults() {
+        quizBox.style.display = 'none';
+        resultBox.style.display = 'block';
+        mistakesBox.classList.remove('show'); 
+        toggleMistakesBtn.innerText = 'Zobrazit chyby';
+        
+        let message = "";
+        if (score === 10) message = "Perfektní znalosti! 🏆";
+        else if (score >= 7) message = "Velmi dobrý výsledek! 👍";
+        else if (score >= 4) message = "Základy ovládáš. 🙂";
+        else message = "Možná to chce opáčko. 📖";
+
+        scoreTextEl.innerHTML = `Tvůj výsledek: <br> <span style="font-size:2.5rem; color:#00247D;">${score}</span> / ${quizData.length} <br><br> <span style="font-size:1.1rem; color:#4b5563;">${message}</span>`;
+        
+        if (score < quizData.length) {
+            toggleMistakesBtn.style.display = 'block';
+        } else {
+            toggleMistakesBtn.style.display = 'none';
+        }
+    }
+
+    function toggleMistakes() {
+        if (!mistakesBox.classList.contains('show')) {
+            if (mistakesList.innerHTML === '') {
+                userAnswers.forEach(ans => {
+                    if (!ans.isCorrect) {
+                        const qData = quizData[ans.questionIndex];
+                        const item = document.createElement('div');
+                        item.classList.add('mistake-item');
+                        item.innerHTML = `
+                            <div class="mistake-q">${qData.question}</div>
+                            <div class="mistake-u">Tvoje odpověď: ${qData.options[ans.selectedIndex]}</div>
+                            <div class="mistake-c">Správná odpověď: ${qData.options[qData.correct]}</div>
+                        `;
+                        mistakesList.appendChild(item);
+                    }
+                });
+            }
+            
+            mistakesBox.classList.add('show');
+            toggleMistakesBtn.innerText = 'Skrýt chyby';
+            
+            setTimeout(() => {
+                mistakesBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }, 100);
+        } else {
+            mistakesBox.classList.remove('show');
+            toggleMistakesBtn.innerText = 'Zobrazit chyby';
+        }
+    }
+
+    function restartQuiz() {
+        currentQuestion = 0;
+        score = 0;
+        userAnswers = [];
+        mistakesList.innerHTML = '';
+        mistakesBox.classList.remove('show');
+        
+        resultBox.style.display = 'none';
+        quizBox.style.display = 'block';
+        contentWrapper.classList.add('show-content');
+        contentWrapper.classList.remove('fade-content');
+        loadQuiz();
+    }
+
+    loadQuiz();
+</script>
+
+</body>
+</html>
